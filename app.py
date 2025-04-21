@@ -1,61 +1,45 @@
-from flask import Flask, render_template, request, jsonify
-import requests
-import statistics
+import hashlib
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# Your eBay App ID
-APP_ID = "TomGenev-CardValu-PRD-6261c5cd3-e868ed16"
-
-# Example cards
-cards = [
-    {"name": "Charizard Base Set", "search_raw": "Charizard Base Set -PSA -BGS -CGC", "search_psa": "Charizard Base Set PSA 10"},
-    {"name": "Pikachu Base Set", "search_raw": "Pikachu Base Set -PSA -BGS -CGC", "search_psa": "Pikachu Base Set PSA 10"},
-]
-
 # Your eBay verification token
 EXPECTED_TOKEN = "mCk87t3oXZQfEpYs2RuJpGbvTnqW9cUL1DJHMe5sKFiAWla0xBYzNh4g"
-
-def get_average_price(query):
-    # Dummy data for now
-    prices = [12.99, 15.49, 13.75, 11.30, 14.00]
-    avg_price = round(statistics.mean(prices), 2)
-    return avg_price
-
-@app.route("/")
-def index():
-    results = []
-    for card in cards:
-        raw_price = get_average_price(card["search_raw"])
-        psa_price = get_average_price(card["search_psa"])
-        results.append({
-            "name": card["name"],
-            "raw": f"£{raw_price}",
-            "psa10": f"£{psa_price}"
-        })
-    return render_template("index.html", cards=results)
+# Your callback URL (same as the one in eBay Developer Portal)
+EXPECTED_ENDPOINT = "https://pokemon-card-app.onrender.com/marketplace-deletion-verification"
 
 @app.route("/marketplace-deletion-verification", methods=["GET"])
 def verify_token():
-    # Check the token from the query string
+    # Retrieve challenge_code and token from the query parameters
+    challenge_code = request.args.get("challenge_code")
     token_from_ebay = request.args.get("token")
-    if not token_from_ebay:
-        # If token is not found in query string, check the Authorization header
-        token_from_ebay = request.headers.get("Authorization")
-        if token_from_ebay:
-            # Remove "Bearer " if it's included in the Authorization header
-            token_from_ebay = token_from_ebay.replace("Bearer ", "")
-    
-    print(f"Received token: {token_from_ebay}")  # Log the token for debugging
-    
-    if token_from_ebay == EXPECTED_TOKEN:
-        return jsonify({"status": "success", "message": "Token verified successfully"})
-    else:
+
+    # Check if the token from eBay matches the expected token
+    if token_from_ebay != EXPECTED_TOKEN:
         return jsonify({"status": "error", "message": "Invalid token"}), 400
 
-@app.route("/debug")
-def debug():
-    return jsonify({"status": "debug endpoint is working"})
+    if challenge_code:
+        # Concatenate challengeCode, verificationToken, and endpoint
+        data_to_hash = challenge_code + EXPECTED_TOKEN + EXPECTED_ENDPOINT
+
+        # Create the SHA-256 hash
+        hashed_value = hashlib.sha256(data_to_hash.encode('utf-8')).hexdigest()
+
+        # Return the response with the challengeResponse field
+        return jsonify({"challengeResponse": hashed_value})
+
+    return jsonify({"status": "error", "message": "No challenge_code received"}), 400
+
+@app.route("/marketplace-account-deletion-notification", methods=["POST"])
+def handle_deletion_notification():
+    # Example of receiving the POST notification (you can extend this to process the data)
+    notification_data = request.get_json()
+
+    # Example: just acknowledge that you received the notification
+    print("Received deletion notification:", notification_data)
+
+    # Respond with an HTTP status code indicating success (200 OK)
+    return jsonify({"status": "success", "message": "Notification received successfully"}), 200
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=10000)  # Port 10000 or any port of your choice
