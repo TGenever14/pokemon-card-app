@@ -13,7 +13,7 @@ cards = [
     {"name": "Pikachu Base Set", "search_raw": "Pikachu Base Set -PSA -BGS -CGC", "search_psa": "Pikachu Base Set PSA 10"},
 ]
 
-# This is your eBay verification token
+# Your eBay verification token
 EXPECTED_TOKEN = "mCk87t3oXZQfEpYs2RuJpGbvTnqW9cUL1DJHMe5sKFiAWla0xBYzNh4g"
 
 def get_average_price(query):
