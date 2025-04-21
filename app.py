@@ -37,7 +37,17 @@ def index():
 
 @app.route("/marketplace-deletion-verification", methods=["GET"])
 def verify_token():
+    # Check the token from the query string
     token_from_ebay = request.args.get("token")
+    if not token_from_ebay:
+        # If token is not found in query string, check the Authorization header
+        token_from_ebay = request.headers.get("Authorization")
+        if token_from_ebay:
+            # Remove "Bearer " if it's included in the Authorization header
+            token_from_ebay = token_from_ebay.replace("Bearer ", "")
+    
+    print(f"Received token: {token_from_ebay}")  # Log the token for debugging
+    
     if token_from_ebay == EXPECTED_TOKEN:
         return jsonify({"status": "success", "message": "Token verified successfully"})
     else:
