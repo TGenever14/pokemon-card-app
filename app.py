@@ -1,12 +1,8 @@
 from flask import Flask, render_template, request, jsonify
 import requests
 import statistics
-import logging
 
 app = Flask(__name__)
-
-# Set up basic logging
-logging.basicConfig(level=logging.DEBUG)
 
 # Your eBay App ID
 APP_ID = "TomGenev-CardValu-PRD-6261c5cd3-e868ed16"
@@ -17,8 +13,8 @@ cards = [
     {"name": "Pikachu Base Set", "search_raw": "Pikachu Base Set -PSA -BGS -CGC", "search_psa": "Pikachu Base Set PSA 10"},
 ]
 
-# This is where you'd store your verification token or a secret key
-EXPECTED_TOKEN = "your_expected_token"  # Replace with the token that eBay will send
+# This is your eBay verification token
+EXPECTED_TOKEN = "mCk87t3oXZQfEpYs2RuJpGbvTnqW9cUL1DJHMe5sKFiAWla0xBYzNh4g"
 
 def get_average_price(query):
     # Dummy data for now
@@ -41,19 +37,14 @@ def index():
 
 @app.route("/marketplace-deletion-verification", methods=["GET"])
 def verify_token():
-    # Get the token from the query string eBay sends (assuming it's sent as a 'token' parameter)
     token_from_ebay = request.args.get("token")
-    
-    # Check if the token matches the expected token
     if token_from_ebay == EXPECTED_TOKEN:
         return jsonify({"status": "success", "message": "Token verified successfully"})
     else:
         return jsonify({"status": "error", "message": "Invalid token"}), 400
 
-# Debug route to check if the app is responding
 @app.route("/debug")
 def debug():
-    app.logger.debug("Debug route has been hit")
     return jsonify({"status": "debug endpoint is working"})
 
 if __name__ == "__main__":
