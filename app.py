@@ -1,6 +1,7 @@
 import csv
 import hashlib
 import os
+import time
 import requests
 from flask import Flask, request, render_template
 
@@ -12,16 +13,23 @@ with open("cards.csv", newline="", encoding="utf-8") as csvfile:
     reader = csv.DictReader(csvfile)
     for row in reader:
         CARDS.append({
-            "name": row["Name"],  # Use the "Name" column
-            "psa_9_query": row["PSA_9_Query"],  # Use the "PSA_9_Query" column
-            "psa_10_query": row["PSA_10_Query"],  # Use the "PSA_10_Query" column
-            "raw_query": row["Raw_Query"],  # Use the "Raw_Query" column
+            "name": row["Name"],
+            "psa_9_query": row["PSA_9_Query"],
+            "psa_10_query": row["PSA_10_Query"],
+            "raw_query": row["Raw_Query"],
         })
 
-# eBay API credentials (replace with your actual values)
+# eBay API credentials
 EBAY_APP_ID = "YOUR_EBAY_APP_ID"
 
+# Simple in-memory cache for prices
+PRICE_CACHE = {}
+
 def get_average_price(title, condition_filter=None):
+    # Check cache first
+    if title in PRICE_CACHE:
+        return PRICE_CACHE[title]
+
     url = "https://api.ebay.com/buy/browse/v1/item_summary/search"
     headers = {
         "Authorization": f"Bearer {os.getenv('EBAY_BEARER_TOKEN')}",
@@ -34,22 +42,32 @@ def get_average_price(title, condition_filter=None):
         "sort": "-price",
     }
 
-    response = requests.get(url, headers=headers, params=params)
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        time.sleep(1)  # Throttle to 1 request per second
 
-    if response.status_code != 200:
-        print(f"eBay API error: {response.text}")
-        return "N/A"
+        if response.status_code != 200:
+            print(f"eBay API error: {response.text}")
+            return "N/A"
 
-    data = response.json()
-    prices = []
-    for item in data.get("itemSummaries", []):
-        price = item.get("price", {}).get("value")
-        if price:
-            prices.append(float(price))
+        data = response.json()
+        prices = [
+            float(item["price"]["value"])
+            for item in data.get("itemSummaries", [])
+            if "price" in item and "value" in item["price"]
+        ]
 
-    if prices:
-        return f"£{sum(prices)/len(prices):.2f}"
-    else:
+        if prices:
+            average = f"£{sum(prices) / len(prices):.2f}"
+        else:
+            average = "N/A"
+
+        # Cache the result
+        PRICE_CACHE[title] = average
+        return average
+
+    except Exception as e:
+        print(f"Error fetching price for '{title}': {e}")
         return "N/A"
 
 @app.route("/")
@@ -83,17 +101,4 @@ def verify_token():
 
     if challenge_code:
         data_to_hash = challenge_code + EXPECTED_TOKEN + EXPECTED_ENDPOINT
-        hashed_value = hashlib.sha256(data_to_hash.encode('utf-8')).hexdigest()
-        return {"challengeResponse": hashed_value}
-    
-    return {"status": "error", "message": "No challenge_code received"}, 400
-
-@app.route("/marketplace-account-deletion-notification", methods=["POST"])
-def handle_deletion_notification():
-    data = request.get_json()
-    print("Received eBay account deletion:", data)
-    return {"status": "success", "message": "Notification received successfully"}
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+        hashed_value = hashlib.sha256_
