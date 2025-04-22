@@ -3,27 +3,39 @@
 <head>
     <title>Pokémon Card Prices</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 2em; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        input { padding: 8px; margin-bottom: 10px; width: 300px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
         th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
     </style>
 </head>
 <body>
-    <h1>Pokémon Card Price Tracker</h1>
-    <table>
-        <tr>
-            <th>Card</th>
-            <th>Raw Price</th>
-            <th>PSA 10 Price</th>
-        </tr>
-        {% for card in cards %}
-        <tr>
-            <td>{{ card.name }}</td>
-            <td>{{ card.raw }}</td>
-            <td>{{ card.psa10 }}</td>
-        </tr>
-        {% endfor %}
-    </table>
+    <h1>Pokémon Card Prices</h1>
+
+    <form method="get">
+        <input type="text" name="q" placeholder="Search card name..." value="{{ query }}">
+        <button type="submit">Search</button>
+    </form>
+
+    {% if results %}
+        <table>
+            <tr>
+                <th>Name</th>
+                <th>Raw Price</th>
+                <th>PSA 9 Price</th>
+                <th>PSA 10 Price</th>
+            </tr>
+            {% for card in results %}
+            <tr>
+                <td>{{ card.name }}</td>
+                <td>{{ card.raw }}</td>
+                <td>{{ card.psa_9 }}</td>
+                <td>{{ card.psa_10 }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>No results found. Try a different search.</p>
+    {% endif %}
 </body>
 </html>
