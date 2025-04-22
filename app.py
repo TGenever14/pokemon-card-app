@@ -101,4 +101,11 @@ def verify_token():
 
     if challenge_code:
         data_to_hash = challenge_code + EXPECTED_TOKEN + EXPECTED_ENDPOINT
-        hashed_value = hashlib.sha256_
+        hashed_value = hashlib.sha256(data_to_hash.encode()).hexdigest()
+        return {"status": "success", "hashed_value": hashed_value}, 200
+
+    return {"status": "error", "message": "Challenge code missing"}, 400
+
+# Ensure the app binds to the correct port when deployed on Render
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
