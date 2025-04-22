@@ -1,36 +1,33 @@
+from flask import Flask, render_template
 import csv
-import hashlib
 import os
-import time
 import requests
+import time
 from datetime import datetime, timedelta
-from flask import Flask, request, render_template
 
 app = Flask(__name__)
 
-# Load card list from CSV on startup
-CARDS = []
-with open("cards.csv", newline="", encoding="utf-8") as csvfile:
-    reader = csv.DictReader(csvfile)
-    for row in reader:
-        CARDS.append({
-            "name": row["Name"],
-            "psa_9_query": row["PSA_9_Query"],
-            "psa_10_query": row["PSA_10_Query"],
-            "raw_query": row["Raw_Query"],
-        })
-
-# eBay API credentials
-EBAY_APP_ID = "YOUR_EBAY_APP_ID"
-
-# Simple in-memory cache for prices with timestamps
+# Cache dictionary
 PRICE_CACHE = {}
 
-def get_average_price(title, condition_filter=None):
-    # Check cache first and if the cached price is older than 24 hours
+# Read card data from CSV
+def read_csv():
+    cards = []
+    with open("cards.csv", newline="") as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            cards.append({
+                "name": row["Name"],
+                "psa10_query": row["PSA_10_Query"],
+                "raw_query": row["Raw_Query"]
+            })
+    return cards
+
+# Function to get average price from eBay with caching and rate limit handling
+def get_average_price(title):
     if title in PRICE_CACHE:
         cached_price, timestamp = PRICE_CACHE[title]
-        if datetime.now() - timestamp < timedelta(days=1):  # 24 hours
+        if datetime.now() - timestamp < timedelta(hours=48):  # Cache for 48 hours
             return cached_price
 
     url = "https://api.ebay.com/buy/browse/v1/item_summary/search"
@@ -47,7 +44,12 @@ def get_average_price(title, condition_filter=None):
 
     try:
         response = requests.get(url, headers=headers, params=params)
-        time.sleep(1)  # Throttle to 1 request per second
+        time.sleep(1)  # Throttle a bit between requests
+
+        if response.status_code == 429 or response.status_code == 2001:
+            print("Rate limit hit. Waiting 60s before retry...")
+            time.sleep(60)
+            return get_average_price(title)
 
         if response.status_code != 200:
             print(f"eBay API error: {response.text}")
@@ -65,7 +67,6 @@ def get_average_price(title, condition_filter=None):
         else:
             average = "N/A"
 
-        # Cache the result with the current timestamp
         PRICE_CACHE[title] = (average, datetime.now())
         return average
 
@@ -75,42 +76,11 @@ def get_average_price(title, condition_filter=None):
 
 @app.route("/")
 def index():
-    query = request.args.get("q", "").lower()
-    results = []
+    cards = read_csv()
+    for card in cards:
+        card["psa10_price"] = get_average_price(card["psa10_query"])
+        card["raw_price"] = get_average_price(card["raw_query"])
+    return render_template("index.html", cards=cards)
 
-    for card in CARDS:
-        if query in card["name"].lower():
-            # Get prices for each condition (raw, psa 9, psa 10)
-            raw_price = get_average_price(card["raw_query"])
-            psa_9_price = get_average_price(card["psa_9_query"])
-            psa_10_price = get_average_price(card["psa_10_query"])
-            
-            results.append({
-                "name": card["name"],
-                "raw": raw_price,
-                "psa_9": psa_9_price,
-                "psa_10": psa_10_price,
-            })
-
-    return render_template("index.html", results=results, query=query)
-
-@app.route("/marketplace-deletion-verification", methods=["GET"])
-def verify_token():
-    challenge_code = request.args.get("challenge_code")
-    token_from_ebay = request.args.get("token")
-    EXPECTED_TOKEN = os.getenv("EBAY_VERIFICATION_TOKEN")
-    EXPECTED_ENDPOINT = "https://pokemon-card-app.onrender.com/marketplace-deletion-verification"
-
-    if token_from_ebay != EXPECTED_TOKEN:
-        return {"status": "error", "message": "Invalid token"}, 400
-
-    if challenge_code:
-        data_to_hash = challenge_code + EXPECTED_TOKEN + EXPECTED_ENDPOINT
-        hashed_value = hashlib.sha256(data_to_hash.encode()).hexdigest()
-        return {"status": "success", "hashed_value": hashed_value}, 200
-
-    return {"status": "error", "message": "Challenge code missing"}, 400
-
-# Ensure the app binds to the correct port when deployed on Render
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
+    app.run(debug=False, host="0.0.0.0", port=10000)
