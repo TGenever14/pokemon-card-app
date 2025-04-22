@@ -77,9 +77,11 @@ def index():
 
     for card in CARDS:
         if query in card["name"].lower():
-            raw_price = "£0.00"
-            psa_9_price = "£0.00"
-            psa_10_price = "£0.00"
+            # Get prices for each condition (raw, psa 9, psa 10)
+            raw_price = get_average_price(card["raw_query"])
+            psa_9_price = get_average_price(card["psa_9_query"])
+            psa_10_price = get_average_price(card["psa_10_query"])
+            
             results.append({
                 "name": card["name"],
                 "raw": raw_price,
