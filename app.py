@@ -25,7 +25,7 @@ EBAY_APP_ID = "YOUR_EBAY_APP_ID"
 # Simple in-memory cache for prices
 PRICE_CACHE = {}
 
-def get_average_price(title, condition_filter=None):
+def get_average_price(title, condition_filter=None, retries=3):
     # Check cache first
     if title in PRICE_CACHE:
         return PRICE_CACHE[title]
@@ -42,33 +42,42 @@ def get_average_price(title, condition_filter=None):
         "sort": "-price",
     }
 
-    try:
-        response = requests.get(url, headers=headers, params=params)
-        time.sleep(1)  # Throttle to 1 request per second
+    attempt = 0
+    while attempt < retries:
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            time.sleep(2)  # Increased wait time to avoid rate limit
 
-        if response.status_code != 200:
-            print(f"eBay API error: {response.text}")
+            if response.status_code == 200:
+                data = response.json()
+                prices = [
+                    float(item["price"]["value"])
+                    for item in data.get("itemSummaries", [])
+                    if "price" in item and "value" in item["price"]
+                ]
+                if prices:
+                    average = f"£{sum(prices) / len(prices):.2f}"
+                else:
+                    average = "N/A"
+
+                # Cache the result
+                PRICE_CACHE[title] = average
+                return average
+            else:
+                print(f"eBay API error: {response.text}")
+                if "Too many requests" in response.text:
+                    # Exponential backoff on rate limiting
+                    print(f"Rate limit reached, retrying in {2 ** attempt} seconds...")
+                    time.sleep(2 ** attempt)
+                    attempt += 1
+                    continue
+                return "N/A"
+        except Exception as e:
+            print(f"Error fetching price for '{title}': {e}")
             return "N/A"
-
-        data = response.json()
-        prices = [
-            float(item["price"]["value"])
-            for item in data.get("itemSummaries", [])
-            if "price" in item and "value" in item["price"]
-        ]
-
-        if prices:
-            average = f"£{sum(prices) / len(prices):.2f}"
-        else:
-            average = "N/A"
-
-        # Cache the result
-        PRICE_CACHE[title] = average
-        return average
-
-    except Exception as e:
-        print(f"Error fetching price for '{title}': {e}")
-        return "N/A"
+    
+    print(f"Failed to fetch price for '{title}' after {retries} attempts.")
+    return "N/A"
 
 @app.route("/")
 def index():
