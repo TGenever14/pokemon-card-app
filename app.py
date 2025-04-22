@@ -91,4 +91,4 @@ def verify_token():
 def handle_deletion_notification():
     data = request.get_json()
     print("Received eBay account deletion:", data)
-    return {"status": "success", "message": "Notification
+    return {"status": "success", "message": "Notification received successfully"}
