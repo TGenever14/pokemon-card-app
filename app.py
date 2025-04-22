@@ -12,9 +12,10 @@ with open("cards.csv", newline="", encoding="utf-8") as csvfile:
     reader = csv.DictReader(csvfile)
     for row in reader:
         CARDS.append({
-            "name": row["name"],
-            "psa_9_title": row["psa_9_title"],
-            "psa_10_title": row["psa_10_title"]
+            "name": row["Name"],  # Use the "Name" column
+            "psa_9_query": row["PSA_9_Query"],  # Use the "PSA_9_Query" column
+            "psa_10_query": row["PSA_10_Query"],  # Use the "PSA_10_Query" column
+            "raw_query": row["Raw_Query"],  # Use the "Raw_Query" column
         })
 
 # eBay API credentials (replace with your actual values)
@@ -58,9 +59,9 @@ def index():
 
     for card in CARDS:
         if query in card["name"].lower():
-            raw_price = get_average_price(card["name"])
-            psa_9_price = get_average_price(card["psa_9_title"])
-            psa_10_price = get_average_price(card["psa_10_title"])
+            raw_price = get_average_price(card["raw_query"])
+            psa_9_price = get_average_price(card["psa_9_query"])
+            psa_10_price = get_average_price(card["psa_10_query"])
             results.append({
                 "name": card["name"],
                 "raw": raw_price,
@@ -92,3 +93,6 @@ def handle_deletion_notification():
     data = request.get_json()
     print("Received eBay account deletion:", data)
     return {"status": "success", "message": "Notification received successfully"}
+
+if __name__ == "__main__":
+    app.run(debug=True)
